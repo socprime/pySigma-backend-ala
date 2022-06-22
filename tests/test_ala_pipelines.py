@@ -1,7 +1,11 @@
 import pytest
 from sigma.collection import SigmaCollection
 from sigma.backends.ala.ala import AzureLogAnalyticsBackend
-from sigma.pipelines.ala.ala import windows_service_source_mapping, azure_log_analytics_windows_pipeline, windows_field_mapping
+from sigma.pipelines.ala.ala import (
+    windows_service_source_mapping,
+    azure_log_analytics_windows_pipeline,
+    windows_field_mapping
+)
 from sigma.exceptions import SigmaTransformationError
 
 

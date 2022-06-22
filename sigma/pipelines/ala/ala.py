@@ -1,14 +1,6 @@
 from sigma.pipelines.common import \
     logsource_windows
-#     logsource_windows_process_creation, \
-#     logsource_windows_registry_add, \
-#     logsource_windows_registry_delete, \
-#     logsource_windows_registry_event, \
-#     logsource_windows_registry_set, \
-#     logsource_windows_file_event, \
-#     logsource_linux_process_creation
 from sigma.processing.transformations import AddConditionTransformation, FieldMappingTransformation
-# from sigma.processing.conditions import LogsourceCondition, IncludeFieldCondition, ExcludeFieldCondition, RuleProcessingItemAppliedCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 
 
