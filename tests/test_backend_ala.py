@@ -62,19 +62,39 @@ def test_ala_single_regex_query(ala_backend : AzureLogAnalyticsBackend):
     ) == "test_product | where (fieldA matches regex '(?i)foo.*bar')"
 
 
-def test_ala_cidr_query(ala_backend : AzureLogAnalyticsBackend):
+def test_ala_cidr_query_single(ala_backend : AzureLogAnalyticsBackend):
     assert ala_backend.convert(
         SigmaCollection.from_yaml("""
-            title: Test
-            status: test
-            logsource:
-                category: test_category
-                product: test_product
-            detection:
-                sel:
-                    fieldA|cidr: 192.168.0.0/16
-                    fieldB: foo
-                    fieldC: bar
-                condition: sel
+title: Test
+status: test
+logsource:
+  category: test_category
+  product: test_product
+detection:
+  sel:
+    fieldA|cidr: 192.168.0.0/16
+    fieldB: foo
+    fieldC: bar
+  condition: sel
         """)
-    ) == "test_product | where (sip:192.168.0.0/16 and fieldB == 'foo' and fieldC == 'bar')"
+    ) == """test_product | where (ipv4_is_in_range(fieldA, "192.168.0.0/16") and fieldB == 'foo' and fieldC == 'bar')"""
+
+
+def test_ala_cidr_query_in_list(ala_backend : AzureLogAnalyticsBackend):
+    assert ala_backend.convert(
+        SigmaCollection.from_yaml("""
+title: Test
+status: test
+logsource:
+  category: test_category
+  product: test_product
+detection:
+  sel:
+    fieldA|cidr: 
+     - 192.168.0.0/16
+     - 172.16.0.0/32
+    fieldB: foo
+    fieldC: bar
+  condition: sel
+        """)
+    ) == """test_product | where ((ipv4_is_in_range(fieldA, "192.168.0.0/16") or ipv4_is_in_range(fieldA, "172.16.0.0/32")) and fieldB == 'foo' and fieldC == 'bar')"""

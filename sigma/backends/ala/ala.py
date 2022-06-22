@@ -26,7 +26,7 @@ class AzureLogAnalyticsBackend(TextQueryBackend):
     re_expression : ClassVar[str] = "{field} matches regex '(?i){regex}'"
     re_escape_char : ClassVar[str] = "\\"
 
-    cidr_expression : ClassVar[str] = "sip:{value}"
+    cidr_expression : ClassVar[str] = 'ipv4_is_in_range({field}, "{value}")'
     cidr_in_list_expression : ClassVar[str] = "{field} in ({list})"
 
     compare_op_expression : ClassVar[str] = "{field}{operator}{value}"
