@@ -54,18 +54,18 @@ class AzureLogAnalyticsBackend(TextQueryBackend):
         self.min_time = min_time or "-30d"
         self.max_time = max_time or "now"
     
-    def choose_table_name(self, rule_collection : SigmaCollection) -> str:
+    def choose_table_name(self, rule : SigmaRule) -> str:
         if not self.processing_pipeline: # if not any processing pipeline -> return product category
-            return rule_collection.rules[0].logsource.product
-        else:
-            product = rule_collection.rules[0].logsource.product
-            category = rule_collection.rules[0].logsource.category
+            return rule.logsource.category or rule.logsource.product
+        elif self.processing_pipeline:
+            product = rule.logsource.product
+            category = rule.logsource.category
 
             for item in self.processing_pipeline.items:
                 if item.rule_conditions:
                     if item.rule_conditions[0].product == product and item.rule_conditions[0].service == category:
-                        return item.transformation.conditions['source']
-        return rule_collection.rules[0].logsource.product
+                        return item.transformation.val
+        return rule.logsource.product
     
     def convert_condition_not(self, cond : ConditionNOT, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of NOT conditions."""
@@ -83,22 +83,17 @@ class AzureLogAnalyticsBackend(TextQueryBackend):
         except TypeError:       # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
 
-    def convert(self, rule_collection : SigmaCollection, output_format : Optional[str] = None) -> Any:
-        """
-        Convert a Sigma ruleset into the target data structure. Usually the result are one or
-        multiple queries, but might also be some arbitrary data structure required for further
-        processing.
-        """
-        self.table = self.choose_table_name(rule_collection=rule_collection) # need to use in self.finalize
-        queries = [
-            query
-            for rule in rule_collection.rules
-            for query in self.convert_rule(rule, output_format or self.default_format)
-        ]
-        return self.finalize(queries, output_format or self.default_format)
+    def finalize_query(self, rule : SigmaRule, query : Any, index : int, state : ConversionState, output_format : str):
+        return super().finalize_query(
+            rule,
+            f"{self.choose_table_name(rule=rule)} | where ({query})",
+            index,
+            state,
+            output_format
+        )
 
-    def finalize(self, queries : List[Any], output_format : str):
-        """Finalize output. Dispatches to format-specific method."""
-        begin_string = f"{self.table} | where "
-        query = "".join(queries)
-        return f"{begin_string}({query})"
+    def finalize_output_default(self, queries : List[Any]) -> Any:
+        if len(queries) == 1:
+            return queries[0]
+        return queries
+

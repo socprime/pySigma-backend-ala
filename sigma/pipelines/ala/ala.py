@@ -1,6 +1,6 @@
 from sigma.pipelines.common import \
     logsource_windows
-from sigma.processing.transformations import AddConditionTransformation, FieldMappingTransformation
+from sigma.processing.transformations import AddConditionTransformation, FieldMappingTransformation, SetStateTransformation
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 
 
@@ -56,7 +56,7 @@ def azure_log_analytics_windows_pipeline():
         items=[
             ProcessingItem(         # log sources mapped from windows_service_source_mapping
                 identifier=f"azure_windows_{service}",
-                transformation=AddConditionTransformation({ "source": source}),
+                transformation=SetStateTransformation(service, source),
                 rule_conditions=[logsource_windows(service)],
             )
             for service, source in windows_service_source_mapping.items()
