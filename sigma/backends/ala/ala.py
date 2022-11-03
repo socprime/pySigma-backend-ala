@@ -4,9 +4,10 @@ from sigma.rule import SigmaRule
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression
 from sigma.conditions import ConditionFieldEqualsValueExpression, ConditionNOT
-from sigma.types import SigmaCompareExpression
+from sigma.types import SigmaCompareExpression, SpecialChars
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 from typing import Any, ClassVar, Dict, List, Optional, Union
+
 
 
 class AzureLogAnalyticsBackend(TextQueryBackend):
@@ -16,14 +17,14 @@ class AzureLogAnalyticsBackend(TextQueryBackend):
     or_token : ClassVar[str] = "or"
     and_token : ClassVar[str] = "and"
     not_token : ClassVar[str] = "not"
-    eq_token : ClassVar[str] = " == "
+    eq_token : ClassVar[str] = " =~ "
 
     str_quote : ClassVar[str] = "'"
     escape_char : ClassVar[str] = "\\"
     wildcard_multi : ClassVar[str] = "*"
     wildcard_single : ClassVar[str] = "?"
 
-    re_expression : ClassVar[str] = "{field} matches regex '(?i){regex}'"
+    re_expression : ClassVar[str] = "({field} matches regex @'(?i){regex}')"
     re_escape_char : ClassVar[str] = "\\"
 
     cidr_expression : ClassVar[str] = 'ipv4_is_in_range({field}, "{value}")'
@@ -45,6 +46,10 @@ class AzureLogAnalyticsBackend(TextQueryBackend):
     unbound_value_str_expression : ClassVar[str] = "* contains '{value}'"
     unbound_value_num_expression : ClassVar[str] = "* contains '{value}'"
     unbound_value_re_expression : ClassVar[str] = '"{value}"'
+
+    startswith_expression : ClassVar[str] = "{field} startswith '{value}'"
+    endswith_expression   : ClassVar[str] = "{field} endswith '{value}'"
+    contains_expression   : ClassVar[str] = "{field} contains '{value}'"
 
     deferred_start : ClassVar[str] = "\n"
     deferred_separator : ClassVar[str] = "\n"
@@ -82,6 +87,44 @@ class AzureLogAnalyticsBackend(TextQueryBackend):
                     return self.not_token + self.token_separator + "(" + expr + ")"
         except TypeError:       # pragma: no cover
             raise NotImplementedError("Operator 'not' not supported by the backend")
+
+    def convert_condition_field_eq_val_str(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        """Conversion of field = string value expressions"""
+        try:
+            if (                                                                # Check conditions for usage of 'startswith' operator
+                self.startswith_expression is not None                            # 'startswith' operator is defined in backend
+                and cond.value.endswith(SpecialChars.WILDCARD_MULTI)            # String ends with wildcard
+                and not cond.value[:-1].contains_special()                      # Remainder of string doesn't contains special characters
+                ):
+                expr = self.startswith_expression                               # If all conditions are fulfilled, use 'startswith' operartor instead of equal token
+                value = cond.value[:-1]
+            elif (                                                              # Same as above but for 'endswith' operator: string starts with wildcard and doesn't contains further special characters
+                self.endswith_expression is not None
+                and cond.value.startswith(SpecialChars.WILDCARD_MULTI)
+                and not cond.value[1:].contains_special()
+                ):
+                expr = self.endswith_expression
+                value = cond.value[1:]
+            elif (                                                              # contains: string starts and ends with wildcard
+                self.contains_expression is not None
+                and cond.value.startswith(SpecialChars.WILDCARD_MULTI)
+                and cond.value.endswith(SpecialChars.WILDCARD_MULTI)
+                and not cond.value[1:-1].contains_special()
+                ):
+                expr = self.contains_expression
+                value = cond.value[1:-1]
+            elif (                                                              # wildcard match expression: string contains wildcard
+                self.wildcard_match_expression is not None
+                and cond.value.contains_special()
+                ):
+                expr = self.wildcard_match_expression
+                value = cond.value
+            else:
+                expr =  "(" + "{field}" + self.eq_token + self.str_quote + "{value}" + self.str_quote + ")" # [New]
+                value = cond.value
+            return expr.format(field=self.quote_field(cond.field), value=self.convert_value_str(value, state))
+        except TypeError:       # pragma: no cover
+            raise NotImplementedError("Field equals string value expressions with strings are not supported by the backend.")
 
     def finalize_query(self, rule : SigmaRule, query : Any, index : int, state : ConversionState, output_format : str):
         return super().finalize_query(

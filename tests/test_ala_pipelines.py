@@ -22,12 +22,16 @@ def test_ala_windows_pipeline_simple(service, source):
                 product: windows
                 category: {service}
             detection:
-                sel:
-                    test1: 123
-                    test2: value
-                condition: sel
+                selection:
+                    CommandLine|contains|all:
+                        - 'cmd'
+                    CommandLine2:
+                        - '/c'
+                    CommandLine3|re:
+                    - 'copy'
+                condition: selection
         """)
-    ) == f"{source} | where (test1 == 123 and test2 == 'value')"
+    ) == f"{source} | where (CommandLine contains 'cmd' and (CommandLine2 =~ '/c') and (CommandLine3 matches regex @'(?i)copy'))"
 
 
 @pytest.mark.parametrize(
@@ -47,4 +51,4 @@ def test_ala_windows_field_mapping(field, mapping):
                     {field}: 123
                 condition: sel
         """)
-    ) == f"windows | where ({mapping} == 123)"
+    ) == f"windows | where ({mapping} =~ 123)"

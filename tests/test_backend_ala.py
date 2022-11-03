@@ -18,15 +18,19 @@ def test_ala_in_expression(ala_backend : AzureLogAnalyticsBackend):
                 category: test_category
                 product: test_product
             detection:
-                sel:
-                    fieldA:
-                        - valueA
-                        - valueB
-                        - valueC*
-                condition: sel
+                selection:
+                    CommandLine|contains|all:
+                        - 'cmd'
+                    CommandLine2:
+                        - '/c'
+                    CommandLine3|re:
+                    - 'copy'
+                condition: selection
+            falsepositives:
+                - unknown
+            level: high
         """)
-    ) == "test_category | where (fieldA == 'valueA' or fieldA == 'valueB' or fieldA == 'valueC*')"
-
+    ) == "test_category | where (CommandLine contains 'cmd' and (CommandLine2 =~ '/c') and (CommandLine3 matches regex @'(?i)copy'))"
 
 def test_ala_regex_query(ala_backend : AzureLogAnalyticsBackend):
     assert ala_backend.convert(
@@ -43,7 +47,7 @@ def test_ala_regex_query(ala_backend : AzureLogAnalyticsBackend):
                     fieldC: bar
                 condition: sel
         """)
-    ) == "test_category | where (fieldA matches regex '(?i)foo.*bar' and fieldB == 'foo' and fieldC == 'bar')"
+    ) == "test_category | where ((fieldA matches regex @'(?i)foo.*bar') and (fieldB =~ 'foo') and (fieldC =~ 'bar'))"
 
 
 def test_ala_single_regex_query(ala_backend : AzureLogAnalyticsBackend):
@@ -59,7 +63,7 @@ def test_ala_single_regex_query(ala_backend : AzureLogAnalyticsBackend):
                     fieldA|re: foo.*bar
                 condition: sel
         """)
-    ) == "test_category | where (fieldA matches regex '(?i)foo.*bar')"
+    ) == "test_category | where ((fieldA matches regex @'(?i)foo.*bar'))"
 
 
 def test_ala_cidr_query_single(ala_backend : AzureLogAnalyticsBackend):
@@ -77,7 +81,7 @@ detection:
     fieldC: bar
   condition: sel
         """)
-    ) == """test_category | where (ipv4_is_in_range(fieldA, "192.168.0.0/16") and fieldB == 'foo' and fieldC == 'bar')"""
+    ) == """test_category | where (ipv4_is_in_range(fieldA, "192.168.0.0/16") and (fieldB =~ 'foo') and (fieldC =~ 'bar'))"""
 
 
 def test_ala_cidr_query_in_list(ala_backend : AzureLogAnalyticsBackend):
@@ -97,4 +101,4 @@ detection:
     fieldC: bar
   condition: sel
         """)
-    ) == """test_category | where ((ipv4_is_in_range(fieldA, "192.168.0.0/16") or ipv4_is_in_range(fieldA, "172.16.0.0/32")) and fieldB == 'foo' and fieldC == 'bar')"""
+    ) == """test_category | where ((ipv4_is_in_range(fieldA, "192.168.0.0/16") or ipv4_is_in_range(fieldA, "172.16.0.0/32")) and (fieldB =~ 'foo') and (fieldC =~ 'bar'))"""
